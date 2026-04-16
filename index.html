@@ -250,6 +250,13 @@
 
                 <!-- 裁剪工具面板 -->
                 <div id="cropPanel" class="space-y-6 bg-emerald-50/40 border border-cyan-100 p-5 rounded-2xl hidden animate-in shadow-inner">
+
+                    <!-- 【修改在此】新增正选/反选切换UI -->
+                    <div class="flex bg-white/60 border border-emerald-100 p-1 rounded-xl mb-2">
+                        <button id="cropMode-normal" onclick="setCropInverse(false)" class="flex-1 p-1.5 rounded-lg text-cyan-700 bg-cyan-100 shadow-sm transition-all text-[11px] font-black">正选 (留内)</button>
+                        <button id="cropMode-inverse" onclick="setCropInverse(true)" class="flex-1 p-1.5 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all text-[11px] font-black">反选 (挖空)</button>
+                    </div>
+
                     <div class="grid grid-cols-3 gap-2 w-[80%] mx-auto">
                         <button onclick="setShape('rect')" id="shape-rect" class="shape-btn active">矩形</button>
                         <button onclick="setShape('circle')" id="shape-circle" class="shape-btn">圆形</button>
@@ -517,6 +524,29 @@
         const ICON_SIZE = 28;
         const COLORS = { accent: '#D1F9F1', choc: '#3B2425', muted: '#715D58', locked: '#EF4444' };
 
+        // --- 【修改在此】新增切换裁剪模式函数 ---
+        function setCropInverse(isInverse) {
+            if (selectedIndex !== -1 && images[selectedIndex]) {
+                images[selectedIndex].maskInverse = isInverse;
+                saveState();
+                draw();
+                updateCropModeUI();
+            }
+        }
+
+        // --- 【修改在此】新增更新裁剪模式UI函数 ---
+        function updateCropModeUI() {
+            if (selectedIndex !== -1 && images[selectedIndex]) {
+                const isInverse = images[selectedIndex].maskInverse || false;
+                document.getElementById('cropMode-normal').className = !isInverse 
+                    ? "flex-1 p-1.5 rounded-lg text-cyan-700 bg-cyan-100 shadow-sm transition-all text-[11px] font-black" 
+                    : "flex-1 p-1.5 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all text-[11px] font-black";
+                document.getElementById('cropMode-inverse').className = isInverse 
+                    ? "flex-1 p-1.5 rounded-lg text-cyan-700 bg-cyan-100 shadow-sm transition-all text-[11px] font-black" 
+                    : "flex-1 p-1.5 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all text-[11px] font-black";
+            }
+        }
+
         function initCanvas() {
             const containerWidth = window.innerWidth - (window.innerWidth >= 1024 ? 320 : 0) - 100;
             const containerHeight = window.innerHeight - 150;
@@ -670,8 +700,17 @@
                 if (data.maskShapes && data.maskShapes.length > 0) {
                     pCtx.save(); 
                     pCtx.beginPath(); 
+
+                    // --- 【修改在此】应用反选矩形 ---
+                    if (data.maskInverse) {
+                        pCtx.rect(-99999, -99999, 199998, 199998); 
+                    }
+
                     data.maskShapes.forEach(s => defineShapePath(pCtx, {...s, lx:s.lx*ratio, ly:s.ly*ratio, lw:s.lw*ratio, lh:s.lh*ratio})); 
-                    pCtx.clip(); 
+
+                    // --- 【修改在此】如果是反选，则使用 evenodd 规则进行挖空裁剪 ---
+                    pCtx.clip(data.maskInverse ? "evenodd" : "nonzero");
+
                     drawObject(pCtx, data, dw, dh, ratio); 
                     pCtx.restore();
                 } else {
@@ -808,6 +847,10 @@
             }
 
             if (mode === 'draw') setDrawSubMode(drawSubMode);
+
+            // --- 【修改在此】模式切换时刷新反选UI ---
+            if (mode === 'crop') updateCropModeUI();
+
             draw();
         }
 
@@ -887,7 +930,7 @@
                             type: 'image',
                             img: img, x: canvasSize / 2, y: canvasSize / 2,
                             w: initialW, h: initialW / aspect,
-                            rotation: 0, scale: 1, maskShapes: [], locked: false
+                            rotation: 0, scale: 1, maskShapes: [], maskInverse: false, locked: false // 【修改在此】默认状态 maskInverse = false
                         });
                         selectedIndex = images.length - 1; 
                         saveState();
@@ -939,7 +982,7 @@
                 const newText = {
                     type: 'text', text: textVal,
                     x: canvasSize / 2, y: canvasSize / 2,
-                    rotation: 0, scale: 1, locked: false, maskShapes: [],
+                    rotation: 0, scale: 1, locked: false, maskShapes: [],maskInverse: false, // 【修改在此】默认状态 maskInverse = false
                     fontFamily, fontSize, color, hasShadow, hasStroke, strokeColor,
                     opacity, textAlign
                 };
@@ -1418,7 +1461,17 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
                         ctx.restore(); 
                     }
                     ctx.save(); ctx.beginPath();
+
+                    // --- 【修改在此】应用反选矩形 ---
+                    if (data.maskInverse) {
+                        ctx.rect(-99999, -99999, 199998, 199998); // 覆盖整个画面的极大矩形
+                    }
+
                     data.maskShapes.forEach(s => defineShapePath(ctx, s));
+
+                    // --- 【修改在此】如果是反选，则使用 evenodd 规则进行挖空裁剪 ---
+                    ctx.clip(data.maskInverse ? "evenodd" : "nonzero");
+
                     ctx.clip(); ctx.globalAlpha = data.locked ? 0.8 : 1.0; 
                     drawObject(ctx, data, dw, dh);
                     ctx.restore();
