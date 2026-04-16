@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>艺术切片拼图 Pro - 极简极致版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+   /* 引入像素风字体：Pixelify Sans (数字/英) 和 DotGothic16 (中) */
+        @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=DotGothic16&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=Noto+Serif+SC:wght@700;900&family=Pacifico&display=swap');
+        
+        :root {
+            --mint-primary: #D1F9F1;
+            --mint-light: #E8FDFA;
+            --choc-dark: #3B2425;
+            --choc-muted: #715D58;
+            --bg-creamy: #E8FDFA;
+        }
+
+        body {
+            /* 切换为像素风系统字体组合 */
+            font-family: 'Pixelify Sans', 'DotGothic16', sans-serif;
+            background-color: var(--bg-creamy);
+            user-select: none;
+            overflow: hidden;
+            color: var(--choc-dark);
+        }
+
+        #canvasWrapper {
+            position: relative;
+            transition: transform 0.1s ease-out;
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        #canvasContainer {
+            position: relative;
+            background: #fff;
+            cursor: default;
+            touch-action: none;
+            z-index: 10;
+        }
+
+        #canvasBg {
+            position: absolute;
+            inset: 0;
+            background: #fff;
+            box-shadow: 0 25px 50px -12px rgba(59, 36, 37, 0.12);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        #mainCanvas {
+            position: absolute;
+            pointer-events: auto;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: grid;
+            z-index: 5;
+        }
+
+        .grid-line {
+            border: 1px dashed rgba(113, 93, 88, 0.3);
+        }
+
+        /* 新增：深色主题下的网格线样式 */
+        .grid-overlay.theme-dark .grid-line {
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(232, 253, 250, 0.95);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        /* 按钮样式：圆角方形且高度 50px */
+        .mode-btn {
+            @apply flex-1 flex flex-col items-center justify-center transition-all duration-300 border-2;
+            padding: 8px; 
+            border-radius: 16px !important; 
+            min-height: 50px; 
+        }
+
+        .mode-active {
+            background-color: var(--mint-primary) !important;
+            border-color: var(--choc-muted) !important;
+            color: var(--choc-dark) !important;
+            box-shadow: 0 6px 12px rgba(209, 249, 241, 0.5);
+            transform: scale(1.02);
+        }
+
+        .mode-inactive {
+            background-color: rgba(255, 255, 255, 0.3) !important;
+            border-color: transparent !important;
+            color: #a0aec0 !important;
+        }
+
+        /* 工具切换开关：圆角方形高亮 */
+        .tool-toggle {
+            @apply flex bg-white/60 border border-emerald-100 p-1.5;
+            border-radius: 14px;
+        }
+        
+        .tool-toggle-btn {
+            @apply flex-1 flex items-center justify-center transition-all duration-300;
+            padding: 12px; 
+            border-radius: 10px !important; 
+        }
+
+        .tool-toggle-active {
+            background-color: var(--choc-dark) !important;
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(59, 36, 37, 0.3);
+        }
+
+        .tool-toggle-inactive {
+            color: var(--choc-muted);
+            opacity: 0.6;
+        }
+
+        .add-btn {
+            background-color: var(--choc-dark);
+            color: var(--mint-primary);
+            border-radius: 14px;
+        }
+
+        .aside-panel {
+            background: white;
+            box-shadow: 10px 0 30px rgba(59, 36, 37, 0.05);
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 4px;
+            background: var(--choc-muted);
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(59, 36, 37, 0.2);
+        }
+
+        .layer-btn {
+            @apply p-2.5 bg-white hover:bg-cyan-50 text-slate-600 rounded-xl transition-colors flex items-center justify-center border border-cyan-100 shadow-sm;
+        }
+        
+        .shape-btn {
+            @apply flex flex-col items-center justify-center p-1.5 transition-all;
+            background-color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            font-weight: 700;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            aspect-ratio: 2 / 1;
+        }
+        .shape-btn.active {
+            background-color: var(--mint-primary);
+            border-color: var(--choc-muted);
+            color: var(--choc-dark);
+            box-shadow: 0 4px 10px rgba(209, 249, 241, 0.5);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div class="flex flex-col lg:flex-row h-screen overflow-hidden">
+        <!-- 左侧控制栏 -->
+        <aside class="w-full lg:w-80 aside-panel p-6 overflow-y-auto z-30 flex flex-col border-r border-cyan-100/50">
+            <div class="mb-8 flex items-end justify-between gap-4">
+                <!-- 切分模板 -->
+                <div class="space-y-3 flex-1">
+                     <!-- 【修改在此】去掉了“切分模板 / GRID”文字标题 -->
+                    <div class="flex gap-2">
+                        <div class="flex flex-col gap-1">
+                            <button id="btnGrid2" onclick="changeGrid(2)" class="px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-inactive">2x2</button>
+                            <button id="btnGrid3" onclick="changeGrid(3)" class="px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-active">3x3</button>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-1 pl-2 border-l border-cyan-50">
+                            <button id="undoBtn" onclick="undo()" class="icon-action-btn flex-1 h-full" title="撤回" disabled>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                            </button>
+                            <button id="redoBtn" onclick="redo()" class="icon-action-btn flex-1 h-full" title="恢复" disabled>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"></path></svg>
+                            </button>
+                            <!-- 【修改在此】在恢复按钮右侧新增预览功能按钮（棕色眼睛图标） -->
+                            <button id="previewBtn" onclick="openPreview()" class="icon-action-btn flex-1 h-full" title="预览切片" style="color: var(--choc-dark);">
+                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="relative shrink-0">
+                    <input type="file" id="imageInput" multiple accept="image/*" class="hidden">
+                    <label for="imageInput" class="add-btn flex items-center justify-center w-14 h-14 rounded-md cursor-pointer shadow-lg transition-all">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <!-- 图片外框 -->
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 11.5v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8.5"></path>
+                            <!-- 加号 -->
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 5h6M20 2v6"></path>
+                            <!-- 太阳 -->
+                            <circle cx="9" cy="9" r="1.5" stroke-width="2"></circle>
+                            <!-- 山脉 -->
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
+                        </svg>
+                    </label>
+                </div>
+            </div>
+
+            <div class="space-y-8 flex-1">
+                <!-- 操作模式 -->
+                <div class="space-y-3">
+  					 <!-- 【修改在此】去掉了“操作模式 / MODE”文字标题 -->
+                    <div class="flex gap-2">
+                        <button id="modeTransform" onclick="setInteractionMode('transform')" class="mode-btn mode-active" title="变换">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                        </button>
+                        <button id="modeCrop" onclick="setInteractionMode('crop')" class="mode-btn mode-inactive" title="裁剪">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 12h12l3-12H3z"></path></svg>
+                        </button>
+                        <button id="modeDraw" onclick="setInteractionMode('draw')" class="mode-btn mode-inactive" title="画笔">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button id="modeLayer" onclick="setInteractionMode('layer')" class="mode-btn mode-inactive transition-all" title="调整层级">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2L2 7l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5"></path>
+                            </svg>
+                        </button>
+                        <button id="modeText" onclick="setInteractionMode('text')" class="mode-btn mode-inactive transition-all" title="文字">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 7h16M12 7v14"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 裁剪工具面板 -->
+                <div id="cropPanel" class="space-y-6 bg-emerald-50/40 border border-cyan-100 p-5 rounded-2xl hidden animate-in shadow-inner">
+                    <div class="grid grid-cols-3 gap-2 w-[80%] mx-auto">
+                        <button onclick="setShape('rect')" id="shape-rect" class="shape-btn active">矩形</button>
+                        <button onclick="setShape('circle')" id="shape-circle" class="shape-btn">圆形</button>
+                        <button onclick="setShape('drop')" id="shape-drop" class="shape-btn">水滴形</button>
+                        <button onclick="setShape('snowflake')" id="shape-snowflake" class="shape-btn">像素雪花</button>
+                        <button onclick="setShape('star4')" id="shape-star4" class="shape-btn">四芒星</button>
+                        <button onclick="setShape('star')" id="shape-star" class="shape-btn">五角星</button>
+                        <button onclick="setShape('star6')" id="shape-star6" class="shape-btn">六芒星</button>
+                    </div>
+                    <button onclick="clearMasks()" class="w-full py-3 bg-white text-red-400 text-[11px] font-black rounded-xl border border-red-50 hover:bg-red-50 transition-colors uppercase">清除形状</button>
+                </div>
+
+                <!-- 画笔面板 -->
+                <div id="brushPanel" class="space-y-6 bg-emerald-50/40 border border-cyan-100 p-5 rounded-2xl hidden animate-in shadow-inner">
+                    <div class="tool-toggle mb-2">
+                        <button id="brushSubBtn" onclick="setDrawSubMode('brush')" class="tool-toggle-btn tool-toggle-active" title="画笔">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button id="eraserSubBtn" onclick="setDrawSubMode('eraser')" class="tool-toggle-btn tool-toggle-inactive" title="橡皮擦">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+
+                    <div class="flex items-start gap-4 px-1">
+                        <div id="brushColorWrapper">
+                            <input type="color" id="brushColor" value="#715D58" class="w-12 h-12 rounded-xl cursor-pointer bg-white p-1.5 border border-emerald-100 shrink-0">
+                        </div>
+                        <div class="flex-1 space-y-5">
+                            <div>
+                                <div class="flex justify-between text-[10px] mb-1.5 font-black choc-text opacity-50 uppercase tracking-tighter" style="color: var(--choc-dark)"><span>粗细</span><span id="brushSizeVal">5px</span></div>
+                                <input type="range" id="brushSize" min="1" max="100" value="5" class="w-full">
+                            </div>
+                            <div id="brushOpacityWrapper">
+                                <div class="flex justify-between text-[10px] mb-1.5 font-black choc-text opacity-50 uppercase tracking-tighter" style="color: var(--choc-dark)"><span id="opacityLabel">透明度</span><span id="brushOpacityVal">100%</span></div>
+                                <input type="range" id="brushOpacity" min="1" max="100" value="100" class="w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 文字工具面板 -->
+                <div id="textPanel" class="space-y-5 bg-emerald-50/40 border border-cyan-100 p-5 rounded-2xl hidden animate-in shadow-inner">
+                    <textarea id="textInputVal" rows="2" placeholder="输入要添加的文字（支持换行）..." class="w-full p-3 rounded-xl border border-cyan-100 text-sm font-bold text-slate-700 focus:outline-none focus:border-cyan-300 shadow-sm resize-y"></textarea>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block" style="color: var(--choc-dark)">字体</span>
+                                <button onclick="loadLocalFonts()" class="text-[9px] font-bold text-cyan-600 hover:text-cyan-800 transition-colors bg-cyan-50 px-1.5 py-0.5 rounded shadow-sm">读取系统</button>
+                            </div>
+                            <select id="textFontFamily" class="w-full p-2.5 rounded-xl border border-cyan-100 text-xs font-bold text-slate-700 bg-white outline-none">
+                                  <option value="Noto Sans SC">思源黑体</option>
+                                <option value="DotGothic16">像素点阵体</option>
+                                <option value="Noto Serif SC">思源宋体</option>
+                                <option value="ZCOOL QingKe HuangYou">黄油体</option>
+                                <option value="Pacifico">Pacifico (英文手写)</option>
+                                <option value="Impact">Impact (粗黑体)</option>
+                                <option value="Arial">Arial</option>
+                                <option value="cursive">默认手写体</option>
+
+                            </select>
+                        </div>
+                        <div>
+                            <!-- 【修改在此】将原本的滑块(range)替换为数字输入框(number)，样式与左侧下拉框对齐，并隐藏原有的展示span防JS报错 -->
+                            <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block mb-1.5" style="color: var(--choc-dark)">字号</span>
+                            <input type="number" id="textFontSize" min="1" max="999" value="60" class="w-full p-2.5 rounded-xl border border-cyan-100 text-xs font-bold text-slate-700 bg-white outline-none focus:border-cyan-300 transition-colors">
+                            <span id="textSizeDisplay" style="display: none;">60</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 items-center">
+                        <div>
+                            <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block mb-1.5" style="color: var(--choc-dark)">对齐方式</span>
+                            <div class="flex bg-white/60 border border-emerald-100 p-1 rounded-xl">
+                                <button id="textAlign-left" onclick="setTextAlign('left')" class="flex-1 p-2 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path></svg>
+                                </button>
+                                <button id="textAlign-center" onclick="setTextAlign('center')" class="flex-1 p-2 rounded-lg text-cyan-700 bg-cyan-100 shadow-sm transition-all">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16"></path></svg>
+                                </button>
+                                <button id="textAlign-right" onclick="setTextAlign('right')" class="flex-1 p-2 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all">
+                                    <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block mb-1.5" style="color: var(--choc-dark)">透明度: <span id="textOpacityDisplay">100</span>%</span>
+                            <input type="range" id="textOpacity" min="1" max="100" value="100" class="w-full mt-2">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 items-center">
+                        <div>
+                            <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block mb-1.5" style="color: var(--choc-dark)">字体颜色</span>
+                            <input type="color" id="textColor" value="#3B2425" class="w-10 h-10 rounded-xl cursor-pointer bg-white p-1 border border-emerald-100">
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <label class="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-600 cursor-pointer">
+                                <input type="checkbox" id="textHasShadow" class="w-4 h-4 rounded text-cyan-500"> 阴影投影
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-600 cursor-pointer shrink-0">
+                                    <input type="checkbox" id="textHasStroke" class="w-4 h-4 rounded text-cyan-500"> 包边
+                                </label>
+                                <input type="color" id="textStrokeColor" value="#ffffff" class="w-6 h-6 rounded cursor-pointer border border-slate-200 p-0.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="addOrUpdateText(false)" class="w-full py-3 bg-white text-cyan-600 text-[11px] font-black rounded-xl border border-cyan-100 hover:bg-cyan-50 transition-colors uppercase shadow-sm">
+                        添加新文字
+                    </button>
+                </div>
+
+                <!-- 层级调整面板 -->
+                <div id="layerPanel" class="space-y-4 bg-emerald-50/40 border border-cyan-100 p-5 rounded-2xl hidden animate-in shadow-inner transition-all">
+                    <span class="text-[10px] font-black opacity-40 uppercase tracking-widest block mb-2" style="color: var(--choc-dark)">选中层级 / LAYER</span>
+                    <div class="grid grid-cols-4 gap-3">
+                        <button onclick="changeLayer('top')" title="置于顶层" class="layer-btn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 11l7-7 7 7M5 19l7-7 7 7"></path></svg>
+                        </button>
+                        <button onclick="changeLayer('up')" title="上移一层" class="layer-btn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"></path></svg>
+                        </button>
+                        <button onclick="changeLayer('down')" title="下移一层" class="layer-btn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <button onclick="changeLayer('bottom')" title="置于底层" class="layer-btn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 5l-7 7-7-7m14 8l-7 7-7-7"></path></svg>
+                        </button>
+                    </div>
+                </div>
+
+ 				<!-- 画布背景 -->
+                <div class="space-y-3">
+                    <span class="text-[10px] font-black opacity-30 uppercase tracking-widest block" style="color: var(--choc-dark)">画布背景 / BG COLOR</span>
+                    <!-- 【修改在此】将原本的 bg-white/60 改为了薄荷绿色 bg-[#D1F9F1] -->
+                    <div class="flex items-center gap-3 bg-[#D1F9F1] border border-emerald-100 p-2 rounded-xl">
+                        <input type="color" id="bgColorPicker" value="#ffffff" class="w-8 h-8 rounded-lg cursor-pointer bg-white p-0.5 border border-emerald-100 shrink-0">
+                        <span id="bgColorVal" class="text-[10px] font-black opacity-50 uppercase tracking-widest" style="color: var(--choc-dark)">#FFFFFF</span>
+                    </div>
+                </div>
+
+                <!-- 视口缩放 -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <span class="text-[10px] font-black opacity-30 uppercase tracking-widest" style="color: var(--choc-dark)">视口缩放 / ZOOM</span>
+                        <span id="viewScaleVal" class="text-[10px] font-black px-2 py-0.5 rounded-md" style="background-color: var(--mint-primary); color: var(--choc-dark)">100%</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="viewScaleRange" min="0.5" max="5" step="0.01" value="1" class="flex-1">
+                        <button onclick="resetViewTransform()" class="text-[10px] font-black text-cyan-400 hover:text-cyan-600 transition-colors shrink-0 uppercase">RESET</button>
+                    </div>
+                </div>
+
+                <!-- 清空 -->
+                <div class="pt-6 border-t border-cyan-50">
+                    <button onclick="clearCanvas()" class="w-full py-4 border-2 border-cyan-50 text-cyan-200 text-[11px] font-black rounded-2xl hover:border-red-100 hover:text-red-400 transition-all uppercase tracking-widest">CLEAR ALL</button>
+                </div>
+
+                <!-- 下载 -->
+                <div class="mt-auto pt-8">
+                    <button onclick="exportSlices()" class="w-full py-6 bg-[#3B2425] font-black rounded-2xl shadow-xl shadow-cyan-900/10 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3" style="color: var(--mint-primary)">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l-4-4m0 0l-4 4m4-4v12"></path></svg>
+                        生成并导出
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 画布区 -->
+        <main id="mainWorkspace" class="flex-1 flex items-center justify-center p-4 md:p-12 relative bg-[#E8FDFA]">
+            <div id="canvasWrapper">
+                <div id="canvasContainer">
+                    <div id="canvasBg"></div>
+                    <canvas id="mainCanvas"></canvas>
+                    <div id="gridOverlay" class="grid-overlay"></div>
+                </div>
+                <div class="absolute -bottom-12 left-0 right-0 flex justify-center gap-8 text-[#715D58]/40 text-[10px] font-black uppercase tracking-[0.4em]">
+                    <span id="hintText"></span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 【修改在此】新增预览弹窗结构 -->
+    <div id="previewOverlay" class="fixed inset-0 z-[300] hidden bg-black/80 backdrop-blur-md flex-col items-center justify-center p-4 lg:p-12 transition-all">
+        <div class="w-full max-w-5xl flex justify-between items-center mb-6">
+            <h3 class="text-white text-xl font-black tracking-widest uppercase">切片预览 / PREVIEW</h3>
+            <button onclick="closePreview()" class="text-white/70 hover:text-white transition-colors bg-white/10 p-2 rounded-xl">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div id="previewGrid" class="w-full max-w-5xl grid gap-4 lg:gap-6 bg-white/5 p-4 lg:p-8 rounded-3xl overflow-y-auto max-h-[80vh]">
+            <!-- 预览切片将在这里生成 -->
+        </div>
+    </div>
+
+    <!-- 导出反馈 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center p-12 bg-white rounded-[2rem] shadow-2xl border border-cyan-50">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mb-6" style="border-color: var(--choc-muted); border-top-color: transparent"></div>
+            <p class="choc-text font-black text-xl tracking-tight">正在调制艺术切片...</p>
+            <p id="progressText" class="text-cyan-600/40 text-xs mt-3 font-black tracking-widest uppercase">SLICE PROCESS: 0%</p>
+        </div>
+    </div>
+
+    <canvas id="hiddenExportCanvas" class="hidden"></canvas>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const mainWorkspace = document.getElementById('mainWorkspace');
+        const gridOverlay = document.getElementById('gridOverlay');
+        const imageInput = document.getElementById('imageInput');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const viewScaleRange = document.getElementById('viewScaleRange');
+        const viewScaleVal = document.getElementById('viewScaleVal');
+        const brushPanel = document.getElementById('brushPanel');
+        const cropPanel = document.getElementById('cropPanel');
+        const textPanel = document.getElementById('textPanel');
+        const brushSizeSlider = document.getElementById('brushSize');
+        const brushOpacitySlider = document.getElementById('brushOpacity');
+        
+        const layerPanel = document.getElementById('layerPanel');
+        
+        let images = []; 
+        let drawingPaths = []; 
+        let currentPath = null;
+        let selectedIndex = -1;
+        let activeShapeIndex = -1; 
+        let isDragging = false;
+        let dragTarget = null; 
+        let activeHandle = null; 
+        let lastMousePos = { x: 0, y: 0 };
+        let lastScreenPos = { x: 0, y: 0 };
+        let gridSize = 3;
+        let canvasSize = 600; 
+        let interactionMode = 'transform';
+        let drawSubMode = 'brush';
+        let selectedShapeType = 'rect';
+        
+        let currentTextAlign = 'center';
+
+        // 新增：历史记录状态变量
+        let collageHistory = [];
+        let collageHistoryIndex = -1;
+
+        const doodleBuffer = document.createElement('canvas');
+        const bufferCtx = doodleBuffer.getContext('2d');
+
+        let brushConfig = { size: 5, opacity: 100 };
+        let eraserConfig = { size: 30, opacity: 100 };
+
+        let viewScale = 1.0;
+        let viewOffsetX = 0;
+        let viewOffsetY = 0;
+        let initialPinchDist = null;
+        let initialPinchScale = 1.0;
+
+        const UI_PADDING = 80; 
+        const HANDLE_SIZE = 8;
+        const ICON_SIZE = 28;
+        const COLORS = { accent: '#D1F9F1', choc: '#3B2425', muted: '#715D58', locked: '#EF4444' };
+
+        function initCanvas() {
+            const containerWidth = window.innerWidth - (window.innerWidth >= 1024 ? 320 : 0) - 100;
+            const containerHeight = window.innerHeight - 150;
+            // 调大画布显示上限到 2500
+            const size = Math.min(containerWidth, containerHeight, 2500);
+            canvasSize = size;
+            canvasContainer.style.width = size + 'px';
+            canvasContainer.style.height = size + 'px';
+            canvas.width = size + UI_PADDING * 2;
+            canvas.height = size + UI_PADDING * 2;
+            canvas.style.left = -UI_PADDING + 'px';
+            canvas.style.top = -UI_PADDING + 'px';
+
+            doodleBuffer.width = canvas.width;
+            doodleBuffer.height = canvas.height;
+
+            updateGridOverlay();
+            if (collageHistoryIndex === -1) saveState();
+            draw();
+        }
+
+        function updateGridOverlay() {
+            gridOverlay.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            gridOverlay.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+            gridOverlay.innerHTML = '';
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const line = document.createElement('div');
+                line.className = 'grid-line flex items-center justify-center text-[10px] text-[#715D58]/30 font-black';
+                line.innerText = i + 1;
+                gridOverlay.appendChild(line);
+            }
+        }
+
+        window.addEventListener('resize', initCanvas);
+        window.onload = initCanvas;
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.5 : 0.5;
+            updateViewTransform(viewScale + delta, viewOffsetX, viewOffsetY);
+        }, { passive: false });
+
+        viewScaleRange.addEventListener('input', (e) => {
+            updateViewTransform(parseFloat(e.target.value), viewOffsetX, viewOffsetY);
+        });
+
+        brushSizeSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('brushSizeVal').innerText = val + 'px';
+            if (drawSubMode === 'brush') brushConfig.size = parseInt(val);
+            else eraserConfig.size = parseInt(val);
+        });
+
+        brushOpacitySlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('brushOpacityVal').innerText = val + '%';
+            if (drawSubMode === 'brush') brushConfig.opacity = parseInt(val);
+            else eraserConfig.opacity = parseInt(val);
+        });
+
+        function isColorDark(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+            return luminance < 128;
+        }
+
+        // --- 修复：撤回、恢复与状态保存功能 ---
+        function saveState() {
+            if (collageHistoryIndex < collageHistory.length - 1) {
+                collageHistory = collageHistory.slice(0, collageHistoryIndex + 1);
+            }
+            collageHistory.push({
+                images: images.map(img => ({...img, maskShapes: JSON.parse(JSON.stringify(img.maskShapes))})),
+                drawingPaths: JSON.parse(JSON.stringify(drawingPaths)),
+                gridSize,
+                bgColor: canvasBgColor
+            });
+            if (collageHistory.length > 50) collageHistory.shift();
+            collageHistoryIndex = collageHistory.length - 1;
+            updateHistoryBtns();
+        }
+
+        function undo() { 
+            if (collageHistoryIndex > 0) { 
+                collageHistoryIndex--; 
+                restoreState(); 
+            } 
+        }
+
+        function redo() { 
+            if (collageHistoryIndex < collageHistory.length - 1) { 
+                collageHistoryIndex++; 
+                restoreState(); 
+            } 
+        }
+
+        function restoreState() {
+            const s = collageHistory[collageHistoryIndex];
+            images = s.images.map(img => ({...img}));
+            drawingPaths = JSON.parse(JSON.stringify(s.drawingPaths));
+            gridSize = s.gridSize; 
+            canvasBgColor = s.bgColor;
+            selectedIndex = -1; 
+            activeShapeIndex = -1;
+            document.getElementById('canvasBg').style.backgroundColor = canvasBgColor;
+            
+            const b2 = document.getElementById('btnGrid2');
+            const b3 = document.getElementById('btnGrid3');
+            if (b2 && b3) {
+                b2.className = gridSize === 2 ? 'px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-active' : 'px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-inactive';
+                b3.className = gridSize === 3 ? 'px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-active' : 'px-3 py-1 text-[11px] font-black rounded-lg transition-all mode-inactive';
+            }
+
+            updateGridOverlay(); 
+            updateHistoryBtns(); 
+            draw();
+        }
+
+        function updateHistoryBtns() {
+            const uBtn = document.getElementById('undoBtn');
+            const rBtn = document.getElementById('redoBtn');
+            if (uBtn) uBtn.disabled = collageHistoryIndex <= 0;
+            if (rBtn) rBtn.disabled = collageHistoryIndex >= collageHistory.length - 1;
+        }
+
+        // --- 修复：切片预览功能 ---
+        const previewOverlay = document.getElementById('previewOverlay');
+        function openPreview() {
+            const grid = document.getElementById('previewGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            if(previewOverlay) previewOverlay.style.display = 'flex';
+            
+            const baseSize = 1200; 
+            const pCanvas = document.createElement('canvas'); 
+            pCanvas.width = pCanvas.height = baseSize;
+            const pCtx = pCanvas.getContext('2d'); 
+            const ratio = baseSize / canvasSize;
+            
+            pCtx.fillStyle = canvasBgColor; 
+            pCtx.fillRect(0, 0, baseSize, baseSize);
+            
+            images.forEach(data => {
+                pCtx.save(); 
+                pCtx.translate(data.x * ratio, data.y * ratio); 
+                pCtx.rotate(data.rotation * Math.PI / 180);
+                const dw = data.w * data.scale * ratio, dh = data.h * data.scale * ratio;
+                if (data.maskShapes && data.maskShapes.length > 0) {
+                    pCtx.save(); 
+                    pCtx.beginPath(); 
+                    data.maskShapes.forEach(s => defineShapePath(pCtx, {...s, lx:s.lx*ratio, ly:s.ly*ratio, lw:s.lw*ratio, lh:s.lh*ratio})); 
+                    pCtx.clip(); 
+                    drawObject(pCtx, data, dw, dh, ratio); 
+                    pCtx.restore();
+                } else {
+                    drawObject(pCtx, data, dw, dh, ratio);
+                }
+                pCtx.restore();
+            });
+            
+            const eb = document.createElement('canvas'); 
+            eb.width = eb.height = baseSize; 
+            drawPaths(eb.getContext('2d'), ratio); 
+            pCtx.drawImage(eb, 0, 0);
+            
+            const sliceSize = baseSize / gridSize;
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const r = Math.floor(i / gridSize), c = i % gridSize;
+                const sc = document.createElement('canvas'); 
+                sc.width = sc.height = sliceSize;
+                sc.getContext('2d').drawImage(pCanvas, c * sliceSize, r * sliceSize, sliceSize, sliceSize, 0, 0, sliceSize, sliceSize);
+                const img = new Image(); 
+                img.src = sc.toDataURL('image/jpeg', 0.85); 
+                img.className = "w-full h-full object-cover rounded-xl shadow-lg border border-white/10"; 
+                grid.appendChild(img);
+            }
+        }
+
+        function closePreview() {
+            if(previewOverlay) previewOverlay.style.display = 'none';
+        }
+
+        let canvasBgColor = '#ffffff';
+        const bgColorPicker = document.getElementById('bgColorPicker');
+        if (bgColorPicker) {
+            bgColorPicker.addEventListener('change', () => saveState());
+            bgColorPicker.addEventListener('input', (e) => {
+                canvasBgColor = e.target.value;
+                document.getElementById('bgColorVal').innerText = canvasBgColor.toUpperCase();
+                document.getElementById('canvasBg').style.backgroundColor = canvasBgColor;
+                if (isColorDark(canvasBgColor)) gridOverlay.classList.add('theme-dark');
+                else gridOverlay.classList.remove('theme-dark');
+            });
+        }
+
+        // 文字设置实时联动
+        document.getElementById('textFontSize').addEventListener('input', (e) => {
+            document.getElementById('textSizeDisplay').innerText = e.target.value;
+        });
+        
+        document.getElementById('textOpacity').addEventListener('input', (e) => {
+            document.getElementById('textOpacityDisplay').innerText = e.target.value;
+        });
+
+        const textInputs = ['textInputVal', 'textFontFamily', 'textFontSize', 'textColor', 'textHasShadow', 'textHasStroke', 'textStrokeColor', 'textOpacity'];
+        textInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.addEventListener('input', () => {
+                    if (interactionMode === 'text' && selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                        addOrUpdateText(true); 
+                    }
+                });
+                el.addEventListener('change', () => {
+                    if (interactionMode === 'text' && selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                        saveState(); 
+                    }
+                });
+            }
+        });
+        
+        function setTextAlign(align) {
+            currentTextAlign = align;
+            ['left', 'center', 'right'].forEach(a => {
+                const btn = document.getElementById(`textAlign-${a}`);
+                if (btn) {
+                    if (a === align) {
+                        btn.className = "flex-1 p-2 rounded-lg text-cyan-700 bg-cyan-100 shadow-sm transition-all";
+                    } else {
+                        btn.className = "flex-1 p-2 rounded-lg text-slate-500 hover:bg-cyan-50 transition-all";
+                    }
+                }
+            });
+            if (interactionMode === 'text' && selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                addOrUpdateText(true);
+                saveState();
+            }
+        }
+
+        // 设置画笔子模式
+        function setDrawSubMode(subMode) {
+            if (drawSubMode === 'brush') { brushConfig.size = parseInt(brushSizeSlider.value); brushConfig.opacity = parseInt(brushOpacitySlider.value); }
+            else { eraserConfig.size = parseInt(brushSizeSlider.value); eraserConfig.opacity = parseInt(brushOpacitySlider.value); }
+            drawSubMode = subMode;
+            const isBrush = subMode === 'brush';
+            document.getElementById('brushSubBtn').className = `tool-toggle-btn ${isBrush ? 'tool-toggle-active' : 'tool-toggle-inactive'}`;
+            document.getElementById('eraserSubBtn').className = `tool-toggle-btn ${!isBrush ? 'tool-toggle-active' : 'tool-toggle-inactive'}`;
+            document.getElementById('brushColorWrapper').style.display = isBrush ? "block" : "none";
+            brushSizeSlider.value = isBrush ? brushConfig.size : eraserConfig.size;
+            brushOpacitySlider.value = isBrush ? brushConfig.opacity : eraserConfig.opacity;
+            document.getElementById('brushSizeVal').innerText = brushSizeSlider.value + 'px';
+            document.getElementById('brushOpacityVal').innerText = brushOpacitySlider.value + '%';
+        }
+
+        function setInteractionMode(mode) {
+            interactionMode = mode;
+            document.getElementById('modeTransform').className = `mode-btn ${mode === 'transform' ? 'mode-active' : 'mode-inactive'}`;
+            document.getElementById('modeCrop').className = `mode-btn ${mode === 'crop' ? 'mode-active' : 'mode-inactive'}`;
+            document.getElementById('modeDraw').className = `mode-btn ${mode === 'draw' ? 'mode-active' : 'mode-inactive'}`;
+            
+            const layerBtn = document.getElementById('modeLayer');
+            if(layerBtn) layerBtn.className = `mode-btn ${mode === 'layer' ? 'mode-active' : 'mode-inactive'} transition-all`;
+
+            const textBtn = document.getElementById('modeText');
+            if(textBtn) textBtn.className = `mode-btn ${mode === 'text' ? 'mode-active' : 'mode-inactive'} transition-all`;
+
+            brushPanel.classList.toggle('hidden', mode !== 'draw');
+            cropPanel.classList.toggle('hidden', mode !== 'crop');
+            textPanel.classList.toggle('hidden', mode !== 'text');
+            layerPanel.classList.toggle('hidden', mode !== 'layer');
+
+            // 如果切换到文字模式，且当前选中的是文字对象，同步面板数据
+            if (mode === 'text' && selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                const t = images[selectedIndex];
+                document.getElementById('textInputVal').value = t.text;
+                document.getElementById('textFontFamily').value = t.fontFamily;
+                document.getElementById('textFontSize').value = t.fontSize;
+                document.getElementById('textSizeDisplay').innerText = t.fontSize;
+                document.getElementById('textColor').value = t.color;
+                document.getElementById('textHasShadow').checked = t.hasShadow;
+                document.getElementById('textHasStroke').checked = t.hasStroke;
+                document.getElementById('textStrokeColor').value = t.strokeColor;
+                document.getElementById('textOpacity').value = t.opacity !== undefined ? t.opacity : 100;
+                document.getElementById('textOpacityDisplay').innerText = t.opacity !== undefined ? t.opacity : 100;
+                setTextAlign(t.textAlign || 'center');
+            }
+
+            if (mode === 'draw') setDrawSubMode(drawSubMode);
+            draw();
+        }
+
+        function setShape(type) {
+            selectedShapeType = type;
+            ['rect', 'circle', 'drop','snowflake', 'star', 'star4', 'star6'].forEach(s => {
+                const btn = document.getElementById(`shape-${s}`);
+                if (btn) btn.classList.toggle('active', s === type);
+            });
+        }
+
+        function clearMasks() {
+            if (selectedIndex !== -1) {
+                images[selectedIndex].maskShapes = [];
+                activeShapeIndex = -1;
+                saveState();
+                draw();
+            }
+        }
+
+        function updateViewTransform(newScale, newX, newY) {
+            // 视口缩放限制更新为 5.0
+            viewScale = Math.max(0.5, Math.min(5, newScale));
+            document.getElementById('viewScaleRange').value = viewScale;
+            document.getElementById('viewScaleVal').innerText = Math.round(viewScale * 100) + '%';
+            viewOffsetX = newX; viewOffsetY = newY;
+            canvasWrapper.style.transform = `scale(${viewScale}) translate(${viewOffsetX}px, ${viewOffsetY}px)`;
+        }
+
+        function resetViewTransform() { updateViewTransform(1.0, 0, 0); }
+
+        function changeGrid(n) {
+            gridSize = n;
+            const b2 = document.getElementById('btnGrid2');
+            const b3 = document.getElementById('btnGrid3');
+            const baseClass = 'px-3 py-1 text-[11px] font-black rounded-lg transition-all';
+            if (b2 && b3) {
+                b2.className = `${baseClass} ${n === 2 ? 'mode-active' : 'mode-inactive'}`;
+                b3.className = `${baseClass} ${n === 3 ? 'mode-active' : 'mode-inactive'}`;
+            }
+            updateGridOverlay();
+            saveState();
+            draw();
+        }
+
+        function clearCanvas() { images = []; drawingPaths = []; selectedIndex = -1; saveState(); draw(); }
+
+        function changeLayer(action) {
+            if (selectedIndex === -1) return;
+            const item = images[selectedIndex];
+            images.splice(selectedIndex, 1);
+            if (action === 'top') { images.push(item); selectedIndex = images.length - 1; }
+            else if (action === 'bottom') { images.unshift(item); selectedIndex = 0; }
+            else if (action === 'up') {
+                const targetIdx = Math.min(images.length, selectedIndex + 1);
+                images.splice(targetIdx, 0, item);
+                selectedIndex = targetIdx;
+            } else if (action === 'down') {
+                const targetIdx = Math.max(0, selectedIndex - 1);
+                images.splice(targetIdx, 0, item);
+                selectedIndex = targetIdx;
+            }
+            saveState();
+            draw();
+        }
+
+        imageInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const aspect = img.width / img.height;
+                        const initialW = canvasSize * 0.4;
+                        images.push({
+                            type: 'image',
+                            img: img, x: canvasSize / 2, y: canvasSize / 2,
+                            w: initialW, h: initialW / aspect,
+                            rotation: 0, scale: 1, maskShapes: [], locked: false
+                        });
+                        selectedIndex = images.length - 1; 
+                        saveState();
+                        draw();
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            // 【修改在此】清空 input 的 value，使得同一张图片可以被连续多次选中并触发 change 事件
+            e.target.value = '';
+        });
+
+        // 根据文字内容及字体大小动态更新文字元素的边界宽高
+        function updateTextDimensions(data) {
+            ctx.save();
+            ctx.font = `900 ${data.fontSize}px "${data.fontFamily}"`;
+            const lines = data.text.split('\n');
+            let maxWidth = 50;
+            lines.forEach(line => {
+                const metrics = ctx.measureText(line);
+                if (metrics.width > maxWidth) maxWidth = metrics.width;
+            });
+            data.w = maxWidth;
+            // 粗略估算高度用于碰撞检测，支持多行
+            data.h = data.fontSize * 1.2 * Math.max(1, lines.length); 
+            ctx.restore();
+        }
+
+        // 新增文字或更新选中的文字
+        function addOrUpdateText(isUpdateOnly = false) {
+            const textVal = document.getElementById('textInputVal').value || "文本";
+            const fontFamily = document.getElementById('textFontFamily').value;
+            const fontSize = parseInt(document.getElementById('textFontSize').value);
+            const color = document.getElementById('textColor').value;
+            const hasShadow = document.getElementById('textHasShadow').checked;
+            const hasStroke = document.getElementById('textHasStroke').checked;
+            const strokeColor = document.getElementById('textStrokeColor').value;
+            const opacity = parseInt(document.getElementById('textOpacity').value);
+            const textAlign = currentTextAlign;
+
+            if (selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                const t = images[selectedIndex];
+                t.text = textVal; t.fontFamily = fontFamily; t.fontSize = fontSize;
+                t.color = color; t.hasShadow = hasShadow; t.hasStroke = hasStroke; t.strokeColor = strokeColor;
+                t.opacity = opacity; t.textAlign = textAlign;
+                updateTextDimensions(t);
+            } else if (!isUpdateOnly) {
+                const newText = {
+                    type: 'text', text: textVal,
+                    x: canvasSize / 2, y: canvasSize / 2,
+                    rotation: 0, scale: 1, locked: false, maskShapes: [],
+                    fontFamily, fontSize, color, hasShadow, hasStroke, strokeColor,
+                    opacity, textAlign
+                };
+                updateTextDimensions(newText);
+                images.push(newText);
+                selectedIndex = images.length - 1;
+                saveState();
+            }
+            draw();
+        }
+
+        function defineShapePath(ctx, shape) {
+            const { lx, ly, lw, lh, rotation, type } = shape;
+            ctx.save();
+            ctx.translate(lx, ly);
+            ctx.rotate(rotation * Math.PI / 180);
+            
+            switch(type) {
+                case 'rect': 
+                    ctx.rect(-lw/2, -lh/2, lw, lh); 
+                    break;
+                case 'circle': 
+                    ctx.moveTo(lw/2, 0); 
+                    ctx.ellipse(0, 0, lw/2, lh/2, 0, 0, Math.PI*2); 
+                    break;
+                case 'drop':
+                    ctx.moveTo(0, -lh/2);
+                    ctx.bezierCurveTo(lw/6, -lh/4, lw/2, -lh/8, lw/2, lh/4);
+                    ctx.ellipse(0, lh/4, lw/2, lh/4, 0, 0, Math.PI);
+                    ctx.bezierCurveTo(-lw/2, -lh/8, -lw/6, -lh/4, 0, -lh/2);
+                    break;
+ 				case 'snowflake':
+                	const p = lw / 11; 
+const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
+                	for(let i=0; i<11; i++) { r(5, i); r(i, 5); }
+                	[2,3,4,6,7,8].forEach(v => { r(v, v); r(v, 10-v); });
+                	[[1,4],[1,6],[4,1],[6,1],[9,4],[9,6],[4,9],[6,9]].forEach(d => r(d[0], d[1]));
+                    break;
+                case 'star':
+                    for(let i = 0; i < 10; i++) {
+                        const r = (i % 2 === 0) ? lw/2 : lw/4;
+                        const a = Math.PI * 2 * i / 10 - Math.PI / 2;
+                        if (i === 0) ctx.moveTo(r * Math.cos(a), r * Math.sin(a));
+                        else ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
+                    }
+                    ctx.closePath();
+                    break;
+                case 'star4':
+                    for(let i = 0; i < 8; i++) {
+                        const r = (i % 2 === 0) ? lw/2 : lw/6;
+                        const a = Math.PI * 2 * i / 8 - Math.PI / 2;
+                        if (i === 0) ctx.moveTo(r * Math.cos(a), r * Math.sin(a));
+                        else ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
+                    }
+                    ctx.closePath();
+                    break;
+                case 'star6':
+                    for(let i = 0; i < 12; i++) {
+                        const r = (i % 2 === 0) ? lw/2 : lw/3.5;
+                        const a = Math.PI * 2 * i / 12 - Math.PI / 2;
+                        if (i === 0) ctx.moveTo(r * Math.cos(a), r * Math.sin(a));
+                        else ctx.lineTo(r * Math.cos(a), r * Math.sin(a));
+                    }
+                    ctx.closePath();
+                    break;
+            }
+            ctx.restore();
+        }
+
+        const handleDown = (e) => {
+            if (e.touches && e.touches.length === 2) {
+                isDragging = false;
+                initialPinchDist = Math.sqrt((e.touches[0].clientX - e.touches[1].clientX)**2 + (e.touches[0].clientY - e.touches[1].clientY)**2);
+                initialPinchScale = viewScale;
+                return;
+            }
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const rect = canvas.getBoundingClientRect();
+            const x = (clientX - rect.left) / viewScale - UI_PADDING;
+            const y = (clientY - rect.top) / viewScale - UI_PADDING;
+            
+            if (interactionMode === 'draw') {
+                isDragging = true; dragTarget = 'brush';
+                const config = drawSubMode === 'brush' ? brushConfig : eraserConfig;
+                currentPath = { points: [{x, y}], color: document.getElementById('brushColor').value, width: config.size, opacity: config.opacity/100, isEraser: drawSubMode === 'eraser' };
+                drawingPaths.push(currentPath);
+                return;
+            }
+
+            if ((interactionMode === 'transform' || interactionMode === 'layer') && selectedIndex !== -1) {
+                const img = images[selectedIndex];
+                const dx = x - img.x; const dy = y - img.y;
+                const rad = -img.rotation * Math.PI / 180;
+                const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+                const dw = img.w * img.scale; const dh = img.h * img.scale;
+
+                const checkRect = (hx, hy, size) => Math.abs(rx - hx) < size/2 && Math.abs(ry - hy) < size/2;
+                const checkCircle = (hx, hy, r) => Math.sqrt((rx-hx)**2 + (ry-hy)**2) < r;
+
+                if (checkRect(-dw/2, -dh/2 - 25, ICON_SIZE)) {
+                    images.splice(selectedIndex, 1); selectedIndex = -1; saveState(); draw(); return;
+                }
+                if (checkRect(dw/2, -dh/2 - 25, ICON_SIZE)) {
+                    img.locked = !img.locked; saveState(); draw(); return;
+                }
+
+                if (!img.locked) {
+                    if (checkCircle(0, -dh/2 - 45, 15)) {
+                        isDragging = true; dragTarget = 'image-handle'; activeHandle = 'rotate';
+                        lastMousePos = { x, y }; return;
+                    }
+                    if (checkCircle(-dw/2, -dh/2, HANDLE_SIZE)) activeHandle = 'scale-tl';
+                    else if (checkCircle(dw/2, -dh/2, HANDLE_SIZE)) activeHandle = 'scale-tr';
+                    else if (checkCircle(-dw/2, dh/2, HANDLE_SIZE)) activeHandle = 'scale-bl';
+                    else if (checkCircle(dw/2, dh/2, HANDLE_SIZE)) activeHandle = 'scale-br';
+
+                    if (activeHandle) {
+                        isDragging = true; dragTarget = 'image-handle'; lastMousePos = { x, y }; return;
+                    }
+                }
+            }
+
+            if (interactionMode === 'crop' && selectedIndex !== -1) {
+                const img = images[selectedIndex];
+                const dx = x - img.x, dy = y - img.y;
+                const rad = -img.rotation * Math.PI / 180;
+                const rx = dx * Math.cos(rad) - dy * Math.sin(rad), ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+                if (activeShapeIndex !== -1 && img.maskShapes && img.maskShapes[activeShapeIndex]) {
+                    const i = activeShapeIndex;
+                    const s = img.maskShapes[i];
+                    const sRad = -s.rotation * Math.PI / 180;
+                    const srx = (rx - s.lx) * Math.cos(sRad) - (ry - s.ly) * Math.sin(sRad);
+                    const sry = (rx - s.lx) * Math.sin(sRad) + (ry - s.ly) * Math.cos(sRad);
+
+                    if (Math.sqrt(srx**2 + (sry + s.lh/2 + 20)**2) < 15) {
+                        isDragging = true; dragTarget = 'handle'; activeHandle = 'rotate';
+                        lastMousePos = { x, y }; draw(); return;
+                    }
+                    
+                    const hs = [
+                        {id:'tl',x:-s.lw/2,y:-s.lh/2},{id:'tr',x:s.lw/2,y:-s.lh/2},{id:'bl',x:-s.lw/2,y:s.lh/2},{id:'br',x:s.lw/2,y:s.lh/2},
+                        {id:'t',x:0,y:-s.lh/2},{id:'b',x:0,y:s.lh/2},{id:'l',x:-s.lw/2,y:0},{id:'r',x:s.lw/2,y:0}
+                    ];
+                    for (const h of hs) {
+                        if (Math.abs(srx - h.x) < 12 && Math.abs(sry - h.y) < 12) {
+                            isDragging = true; dragTarget = 'handle'; activeHandle = h.id;
+                            lastMousePos = { x, y }; draw(); return;
+                        }
+                    }
+                }
+
+                if (img.maskShapes) {
+                    for (let i = img.maskShapes.length - 1; i >= 0; i--) {
+                        const s = img.maskShapes[i];
+                        const sRad = -s.rotation * Math.PI / 180;
+                        const srx = (rx - s.lx) * Math.cos(sRad) - (ry - s.ly) * Math.sin(sRad);
+                        const sry = (rx - s.lx) * Math.sin(sRad) + (ry - s.ly) * Math.cos(sRad);
+
+                        if (Math.abs(srx) < s.lw/2 && Math.abs(sry) < s.lh/2) {
+                            activeShapeIndex = i; isDragging = true; dragTarget = 'shape';
+                            lastMousePos = { x, y }; draw(); return;
+                        }
+                    }
+                }
+            }
+
+            let foundImgIndex = -1;
+            for(let i=images.length-1; i>=0; i--) {
+                const d = images[i];
+                const dx = x - d.x, dy = y - d.y;
+                const rad = -d.rotation * Math.PI / 180;
+                const rx = dx * Math.cos(rad) - dy * Math.sin(rad), ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+                if (Math.abs(rx) < (d.w*d.scale)/2 && Math.abs(ry) < (d.h*d.scale)/2) {
+                    foundImgIndex = i;
+                    if (interactionMode === 'crop') {
+                        const baseSize = Math.min(d.w*d.scale, d.h*d.scale) * 0.075;
+                        let initW = baseSize;
+                        let initH = baseSize;
+                        
+                        if (selectedShapeType === 'drop') {
+                            initW = baseSize * 0.75;
+                            initH = baseSize * 1.25;
+                        }
+                        
+                        if (!d.maskShapes) d.maskShapes = [];
+                        d.maskShapes.push({ type: selectedShapeType, lx: rx, ly: ry, lw: initW, lh: initH, rotation: 0 });
+                        activeShapeIndex = d.maskShapes.length - 1;
+                    }
+                    break;
+                }
+            }
+            selectedIndex = foundImgIndex;
+            if (foundImgIndex !== -1) { 
+                isDragging = true; 
+                dragTarget = (interactionMode === 'transform' || interactionMode === 'layer' || interactionMode === 'text') ? 'image' : 'shape'; 
+                lastMousePos = { x, y }; 
+                
+                // 选中文字时，同步参数至文字面板
+                if (interactionMode === 'text' && images[selectedIndex].type === 'text') {
+                    const t = images[selectedIndex];
+                    document.getElementById('textInputVal').value = t.text;
+                    document.getElementById('textFontFamily').value = t.fontFamily;
+                    document.getElementById('textFontSize').value = t.fontSize;
+                    document.getElementById('textSizeDisplay').innerText = t.fontSize;
+                    document.getElementById('textColor').value = t.color;
+                    document.getElementById('textHasShadow').checked = t.hasShadow;
+                    document.getElementById('textHasStroke').checked = t.hasStroke;
+                    document.getElementById('textStrokeColor').value = t.strokeColor;
+                    document.getElementById('textOpacity').value = t.opacity !== undefined ? t.opacity : 100;
+                    document.getElementById('textOpacityDisplay').innerText = t.opacity !== undefined ? t.opacity : 100;
+                    setTextAlign(t.textAlign || 'center');
+                }
+            } else { 
+                activeShapeIndex = -1; 
+                isDragging = true; dragTarget = 'pan'; lastScreenPos = { x: clientX, y: clientY }; 
+            }
+            draw();
+        };
+
+        const handleMove = (e) => {
+            if (e.touches && e.touches.length === 2 && initialPinchDist !== null) {
+                const currentDist = Math.sqrt((e.touches[0].clientX - e.touches[1].clientX)**2 + (e.touches[0].clientY - e.touches[1].clientY)**2);
+                updateViewTransform(initialPinchScale * (currentDist / initialPinchDist), viewOffsetX, viewOffsetY);
+                return;
+            }
+            if (!isDragging) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            if (dragTarget === 'pan') {
+                const dx = (clientX - lastScreenPos.x) / viewScale;
+                const dy = (clientY - lastScreenPos.y) / viewScale;
+                updateViewTransform(viewScale, viewOffsetX + dx, viewOffsetY + dy);
+                lastScreenPos = { x: clientX, y: clientY };
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (clientX - rect.left) / viewScale - UI_PADDING;
+            const y = (clientY - rect.top) / viewScale - UI_PADDING;
+            const dx = x - lastMousePos.x, dy = y - lastMousePos.y;
+
+            if (dragTarget === 'brush') { currentPath.points.push({x, y}); draw(); return; }
+            const img = images[selectedIndex];
+            if (!img || img.locked) return;
+
+            if (dragTarget === 'image') { 
+                let nextX = img.x + dx; 
+                let nextY = img.y + dy;
+                const dw = img.w * img.scale; 
+                const dh = img.h * img.scale;
+                const snapThreshold = 4 / viewScale; 
+                const cellSize = canvasSize / gridSize;
+                
+                const gridLines = [];
+                const gridCenters = [];
+                
+                for (let i = 0; i <= gridSize; i++) {
+                    gridLines.push(i * cellSize);
+                    if (i < gridSize) gridCenters.push((i + 0.5) * cellSize);
+                }
+                if (!gridCenters.includes(canvasSize / 2)) gridCenters.push(canvasSize / 2);
+                
+                let snappedX = false;
+                for (let center of gridCenters) {
+                    if (Math.abs(nextX - center) <= snapThreshold) { nextX = center; snappedX = true; break; }
+                }
+                if (!snappedX) {
+                    for (let line of gridLines) {
+                        if (Math.abs((nextX - dw / 2) - line) <= snapThreshold) { nextX = line + dw / 2; break; }
+                        if (Math.abs((nextX + dw / 2) - line) <= snapThreshold) { nextX = line - dw / 2; break; }
+                        if (Math.abs(nextX - line) <= snapThreshold) { nextX = line; break; }
+                    }
+                }
+                
+                let snappedY = false;
+                for (let center of gridCenters) {
+                    if (Math.abs(nextY - center) <= snapThreshold) { nextY = center; snappedY = true; break; }
+                }
+                if (!snappedY) {
+                    for (let line of gridLines) {
+                        if (Math.abs((nextY - dh / 2) - line) <= snapThreshold) { nextY = line + dh / 2; break; }
+                        if (Math.abs((nextY + dh / 2) - line) <= snapThreshold) { nextY = line - dh / 2; break; }
+                        if (Math.abs(nextY - line) <= snapThreshold) { nextY = line; break; }
+                    }
+                }
+                
+                img.x = nextX; 
+                img.y = nextY; 
+            }
+            else if (dragTarget === 'image-handle') {
+                if (activeHandle === 'rotate') {
+                    const angle = Math.atan2(y - img.y, x - img.x);
+                    let newRotation = (angle * 180 / Math.PI) + 90;
+                    
+                    const snapAngle = Math.round(newRotation / 90) * 90;
+                    if (Math.abs(newRotation - snapAngle) < 2) newRotation = snapAngle;
+                    
+                    img.rotation = newRotation;
+                } else if (activeHandle.startsWith('scale')) {
+                    const oldDist = Math.sqrt((lastMousePos.x - img.x)**2 + (lastMousePos.y - img.y)**2);
+                    const newDist = Math.sqrt((x - img.x)**2 + (y - img.y)**2);
+                    img.scale *= (newDist / oldDist);
+                }
+            }
+            else if (dragTarget === 'shape' && activeShapeIndex !== -1) {
+                const rad = -img.rotation * Math.PI / 180;
+                img.maskShapes[activeShapeIndex].lx += dx * Math.cos(rad) - dy * Math.sin(rad);
+                img.maskShapes[activeShapeIndex].ly += dx * Math.sin(rad) + dy * Math.cos(rad);
+            } else if (dragTarget === 'handle' && activeShapeIndex !== -1) {
+                const s = img.maskShapes[activeShapeIndex];
+                if (activeHandle === 'rotate') {
+                    const angle = Math.atan2(y - (img.y + s.ly), x - (img.x + s.lx));
+                    let newRotation = (angle * 180 / Math.PI) + 90 - img.rotation;
+                    
+                    const snapAngle = Math.round(newRotation / 90) * 90;
+                    if (Math.abs(newRotation - snapAngle) < 2) newRotation = snapAngle;
+                    
+                    s.rotation = newRotation;
+                } else {
+                    const rad = -img.rotation * Math.PI / 180;
+                    const ldx = dx * Math.cos(rad) - dy * Math.sin(rad), ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
+                    if (activeHandle.includes('r')) s.lw += ldx * 2;
+                    if (activeHandle.includes('l')) s.lw -= ldx * 2;
+                    if (activeHandle.includes('b')) s.lh += ldy * 2;
+                    if (activeHandle.includes('t')) s.lh -= ldy * 2;
+                    s.lw = Math.max(10, s.lw); s.lh = Math.max(10, s.lh);
+                }
+            }
+            lastMousePos = {x, y}; draw();
+        };
+
+        const handleUp = () => { 
+            if (isDragging || dragTarget === 'shape') {
+                saveState();
+            }
+            isDragging = false; 
+            dragTarget = null; 
+            activeHandle = null; 
+            initialPinchDist = null; 
+            currentPath = null; 
+        };
+
+        canvas.addEventListener('mousedown', handleDown);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleDown(e); }, { passive: false });
+        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); }, { passive: false });
+        window.addEventListener('touchend', handleUp);
+
+        // 新增：处理点击画布外侧空白区域的拖拽和平移
+        const handleDownOutside = (e) => {
+            // 如果点击的是画板本身或是左侧控制面板，则不处理
+            if (e.target === canvas || e.target.closest('aside')) return;
+            
+            const isTouch = !!e.touches;
+            if (isTouch && e.touches.length === 2) {
+                isDragging = false;
+                initialPinchDist = Math.sqrt((e.touches[0].clientX - e.touches[1].clientX)**2 + (e.touches[0].clientY - e.touches[1].clientY)**2);
+                initialPinchScale = viewScale;
+                return;
+            }
+            const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+            const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+            
+            isDragging = true; 
+            dragTarget = 'pan'; 
+            lastScreenPos = { x: clientX, y: clientY };
+            
+            // 点击外侧时自动取消选中的元素，方便查看全局
+            if (selectedIndex !== -1) {
+                selectedIndex = -1;
+                activeShapeIndex = -1;
+                updateToolbarUI();
+                draw();
+            }
+        };
+
+        // 将外侧事件绑定到右侧的 mainWorkspace
+        if (mainWorkspace) {
+            mainWorkspace.addEventListener('mousedown', handleDownOutside);
+            mainWorkspace.addEventListener('touchstart', (e) => { 
+                if (e.target !== canvas) e.preventDefault(); 
+                handleDownOutside(e); 
+            }, { passive: false });
+            
+            // 允许在外围区域使用滚轮缩放画布
+            mainWorkspace.addEventListener('wheel', (e) => {
+                if (e.target === canvas) return; // 画布已有专属监听
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.5 : 0.5;
+                updateViewTransform(viewScale + delta, viewOffsetX, viewOffsetY);
+            }, { passive: false });
+        }
+
+        function drawObject(targetCtx, data, dw, dh, ratio = 1) {
+            if (data.type === 'text') {
+                targetCtx.save();
+                
+                // 应用透明度
+                if (data.opacity !== undefined) {
+                    targetCtx.globalAlpha *= data.opacity / 100;
+                }
+                
+                const finalScale = data.scale * ratio;
+                const scaledFontSize = data.fontSize * finalScale;
+                targetCtx.font = `900 ${scaledFontSize}px "${data.fontFamily}"`;
+                targetCtx.textBaseline = "middle";
+                
+                // 文本对齐逻辑处理
+                const align = data.textAlign || 'center';
+                targetCtx.textAlign = align;
+                
+                if (data.hasShadow) {
+                    targetCtx.shadowColor = "rgba(0,0,0,0.4)";
+                    targetCtx.shadowBlur = 10 * finalScale;
+                    targetCtx.shadowOffsetX = 3 * finalScale;
+                    targetCtx.shadowOffsetY = 3 * finalScale;
+                }
+                
+                const lines = data.text.split('\n');
+                const lineHeight = scaledFontSize * 1.2;
+                const totalHeight = lines.length * lineHeight;
+                const startY = -(totalHeight / 2) + (lineHeight / 2);
+
+                // 计算用于物理中心对齐的动态偏移量 xOffset
+                let maxWidth = 0;
+                lines.forEach(line => {
+                    const w = targetCtx.measureText(line).width;
+                    if(w > maxWidth) maxWidth = w;
+                });
+                
+                let xOffset = 0;
+                if (align === 'left') {
+                    xOffset = -maxWidth / 2;
+                } else if (align === 'right') {
+                    xOffset = maxWidth / 2;
+                }
+
+                if (data.hasStroke) {
+                    targetCtx.lineJoin = 'round';
+                    targetCtx.lineWidth = 6 * finalScale;
+                    targetCtx.strokeStyle = data.strokeColor || "#ffffff";
+                    lines.forEach((line, index) => {
+                        targetCtx.strokeText(line, xOffset, startY + index * lineHeight);
+                    });
+                }
+                
+                targetCtx.fillStyle = data.color;
+                lines.forEach((line, index) => {
+                    targetCtx.fillText(line, xOffset, startY + index * lineHeight);
+                });
+                
+                targetCtx.restore();
+            } else {
+                targetCtx.drawImage(data.img, -dw/2, -dh/2, dw, dh);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save(); ctx.translate(UI_PADDING, UI_PADDING);
+            ctx.save(); ctx.beginPath(); ctx.rect(0, 0, canvasSize, canvasSize); ctx.clip();
+            
+            images.forEach((data, index) => {
+                ctx.save(); ctx.translate(data.x, data.y); ctx.rotate(data.rotation * Math.PI / 180);
+                const dw = data.w * data.scale, dh = data.h * data.scale;
+                
+                if (data.maskShapes && data.maskShapes.length > 0) {
+                    if (interactionMode === 'crop') { 
+                        ctx.save(); ctx.globalAlpha = 0.3; 
+                        drawObject(ctx, data, dw, dh);
+                        ctx.restore(); 
+                    }
+                    ctx.save(); ctx.beginPath();
+                    data.maskShapes.forEach(s => defineShapePath(ctx, s));
+                    ctx.clip(); ctx.globalAlpha = data.locked ? 0.8 : 1.0; 
+                    drawObject(ctx, data, dw, dh);
+                    ctx.restore();
+                    
+                    if (interactionMode === 'crop' && index === selectedIndex) {
+                        data.maskShapes.forEach((s, si) => {
+                            ctx.save(); ctx.translate(s.lx, s.ly); ctx.rotate(s.rotation * Math.PI / 180);
+                            ctx.strokeStyle = si === activeShapeIndex ? "white" : "rgba(255,255,255,0.5)";
+                            ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.strokeRect(-s.lw/2, -s.lh/2, s.lw, s.lh);
+                            if (si === activeShapeIndex) {
+                                ctx.setLineDash([]); ctx.fillStyle = "white";
+                                [[-s.lw/2,-s.lh/2],[s.lw/2,-s.lh/2],[-s.lw/2,s.lh/2],[s.lw/2,s.lh/2],[0,-s.lh/2],[0,s.lh/2],[-s.lw/2,0],[s.lw/2,0]].forEach(p => ctx.fillRect(p[0]-3, p[1]-3, 6, 6));
+                                ctx.beginPath(); ctx.moveTo(0, -s.lh/2); ctx.lineTo(0, -s.lh/2-20); ctx.stroke();
+                                ctx.beginPath(); ctx.arc(0, -s.lh/2-20, 4, 0, Math.PI*2); ctx.fill();
+                            }
+                            ctx.restore();
+                        });
+                    }
+                } else { 
+                    ctx.globalAlpha = data.locked ? 0.8 : 1.0; 
+                    drawObject(ctx, data, dw, dh); 
+                }
+                ctx.restore();
+            });
+
+            bufferCtx.clearRect(0, 0, doodleBuffer.width, doodleBuffer.height);
+            bufferCtx.save(); bufferCtx.translate(UI_PADDING, UI_PADDING);
+            drawPaths(bufferCtx); bufferCtx.restore();
+            ctx.drawImage(doodleBuffer, -UI_PADDING, -UI_PADDING);
+            ctx.restore();
+
+            if (selectedIndex !== -1) {
+                if (layerPanel) { layerPanel.style.opacity = "1"; layerPanel.style.pointerEvents = "auto"; }
+                
+                if (interactionMode === 'transform' || interactionMode === 'layer') {
+                    const data = images[selectedIndex];
+                    ctx.save(); 
+                    ctx.translate(data.x, data.y); 
+                    ctx.rotate(data.rotation * Math.PI / 180);
+                    ctx.strokeStyle = data.locked ? COLORS.locked : COLORS.choc; 
+                    ctx.lineWidth = 1.5; ctx.setLineDash([8, 6]);
+                    const dw = data.w * data.scale;
+                    const dh = data.h * data.scale;
+                    ctx.strokeRect(-dw/2, -dh/2, dw, dh); 
+                    ctx.setLineDash([]);
+                    
+                    const drawBtn = (hx, hy, bgColor, text, textColor = "white") => {
+                        ctx.fillStyle = bgColor; ctx.beginPath(); 
+                        const r = ICON_SIZE / 2;
+                        ctx.roundRect(hx - r, hy - r, r*2, r*2, 6);
+                        ctx.fill();
+                        ctx.fillStyle = textColor; ctx.font = "bold 13px Arial"; 
+                        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, hx, hy+1);
+                    };
+
+                    // 【修改在此】将删除按钮(左侧)的背景色改为 COLORS.accent (薄荷绿)，文字设为 COLORS.choc (巧克力色)
+                    drawBtn(-dw/2, -dh/2 - 25, COLORS.accent, "×", COLORS.choc);
+                    
+                    // 保持锁定按钮(右侧)不变
+
+                    drawBtn(dw/2, -dh/2 - 25, data.locked ? COLORS.locked : COLORS.muted, data.locked ? "L" : "U");
+                    
+                    if (!data.locked) {
+                        const accentColor = COLORS.muted;
+                        const drawHandle = (hx, hy, color) => {
+                            ctx.fillStyle = "#fff"; ctx.strokeStyle = color; ctx.lineWidth = 2; 
+                            ctx.beginPath(); ctx.arc(hx, hy, HANDLE_SIZE/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                        };
+                        ctx.beginPath(); ctx.moveTo(0, -dh/2); ctx.lineTo(0, -dh/2 - 45); 
+                        ctx.strokeStyle = accentColor; ctx.lineWidth = 1.5; ctx.stroke();
+                        drawHandle(0, -dh/2 - 45, accentColor);
+                        drawHandle(-dw/2, -dh/2, accentColor); drawHandle(dw/2, -dh/2, accentColor);
+                        drawHandle(-dw/2, dh/2, accentColor); drawHandle(dw/2, dh/2, accentColor);
+                    }
+                    ctx.restore();
+                }
+            } else { 
+                if (layerPanel) { layerPanel.style.opacity = "0.4"; layerPanel.style.pointerEvents = "none"; }
+            }
+            ctx.restore();
+        }
+
+        function drawPaths(targetCtx, scaleRatio = 1) {
+            targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round';
+            drawingPaths.forEach(path => {
+                if (path.points.length < 2) return;
+                targetCtx.save(); targetCtx.globalCompositeOperation = path.isEraser ? 'destination-out' : 'source-over';
+                targetCtx.globalAlpha = path.opacity; targetCtx.beginPath();
+                targetCtx.strokeStyle = path.isEraser ? 'black' : path.color; targetCtx.lineWidth = path.width * scaleRatio;
+                targetCtx.moveTo(path.points[0].x * scaleRatio, path.points[0].y * scaleRatio);
+                path.points.forEach(p => targetCtx.lineTo(p.x * scaleRatio, p.y * scaleRatio));
+                targetCtx.stroke(); targetCtx.restore();
+            });
+        }
+
+        async function exportSlices() {
+            if (images.length === 0 && drawingPaths.length === 0) return;
+            loadingOverlay.style.display = 'flex';
+            const exportBaseSize = 3000;
+            const exportCanvas = document.getElementById('hiddenExportCanvas');
+            const exCtx = exportCanvas.getContext('2d');
+            exportCanvas.width = exportCanvas.height = exportBaseSize;
+            const ratio = exportBaseSize / canvasSize;
+            exCtx.fillStyle = canvasBgColor; exCtx.fillRect(0, 0, exportBaseSize, exportBaseSize);
+            
+            images.forEach(data => {
+                exCtx.save(); exCtx.translate(data.x * ratio, data.y * ratio); exCtx.rotate(data.rotation * Math.PI / 180);
+                const dw = data.w * data.scale * ratio, dh = data.h * data.scale * ratio;
+                if (data.maskShapes && data.maskShapes.length > 0) {
+                    exCtx.save(); exCtx.beginPath();
+                    data.maskShapes.forEach(s => {
+                        const ss = {...s, lx: s.lx*ratio, ly: s.ly*ratio, lw: s.lw*ratio, lh: s.lh*ratio};
+                        defineShapePath(exCtx, ss);
+                    });
+                    exCtx.clip(); 
+                    drawObject(exCtx, data, dw, dh, ratio);
+                    exCtx.restore();
+                } else {
+                    drawObject(exCtx, data, dw, dh, ratio);
+                }
+                exCtx.restore();
+            });
+
+            const eb = document.createElement('canvas'); eb.width = eb.height = exportBaseSize;
+            drawPaths(eb.getContext('2d'), ratio); exCtx.drawImage(eb, 0, 0);
+
+            const sliceSize = exportBaseSize / gridSize;
+            const totalSlices = gridSize * gridSize;
+            for (let i = 0; i < totalSlices; i++) {
+                document.getElementById('progressText').innerText = `SLICE PROCESS: ${Math.round((i+1)/totalSlices*100)}%`;
+                const row = Math.floor(i / gridSize), col = i % gridSize;
+                const sc = document.createElement('canvas'); sc.width = sc.height = sliceSize;
+                sc.getContext('2d').drawImage(exportCanvas, col*sliceSize, row*sliceSize, sliceSize, sliceSize, 0, 0, sliceSize, sliceSize);
+                const link = document.createElement('a'); link.download = `ArtSlice_${i+1}.jpg`;
+                link.href = sc.toDataURL('image/jpeg', 0.95); link.click();
+                await new Promise(r => setTimeout(r, 400));
+            }
+            loadingOverlay.style.display = 'none';
+        }
+
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.beginPath();
+                this.moveTo(x + r, y);
+                this.arcTo(x + w, y, x + w, y + h, r);
+                this.arcTo(x + w, y + h, x, y + h, r);
+                this.arcTo(x, y + h, x, y, r);
+                this.arcTo(x, y, x + w, y, r);
+                this.closePath();
+                return this;
+            };
+        }
+
+        // 自定义弹窗：替代被浏览器 iframe 拦截的 alert() 和 prompt()
+        function customAlert(msg) {
+            const div = document.createElement('div');
+            div.className = 'fixed top-10 left-1/2 -translate-x-1/2 bg-[#3B2425] text-[#D1F9F1] px-6 py-4 rounded-xl shadow-xl z-[200] font-black text-xs text-center whitespace-pre-wrap transition-opacity duration-300';
+            div.innerText = msg;
+            document.body.appendChild(div);
+            setTimeout(() => {
+                div.style.opacity = '0';
+                setTimeout(() => div.remove(), 300);
+            }, 3500);
+        }
+
+        function customPrompt(msg, callback) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-[#E8FDFA]/80 backdrop-blur-sm z-[200] flex items-center justify-center';
+            overlay.innerHTML = `
+                <div class="bg-white p-6 rounded-2xl shadow-xl border border-cyan-100 w-80 max-w-[90%]">
+                    <p class="text-xs font-black text-[#715D58] mb-4 whitespace-pre-wrap leading-relaxed">${msg}</p>
+                    <input type="text" id="promptInput" class="w-full p-3 border-2 border-cyan-50 rounded-xl mb-5 focus:outline-none focus:border-cyan-300 text-sm font-bold text-slate-700 bg-cyan-50/30">
+                    <div class="flex justify-end gap-2">
+                        <button id="promptCancel" class="px-4 py-2.5 rounded-xl text-[11px] font-black text-slate-500 hover:bg-slate-50 transition-colors uppercase">取消</button>
+                        <button id="promptOk" class="px-4 py-2.5 rounded-xl text-[11px] font-black text-[#D1F9F1] bg-[#3B2425] hover:bg-[#2a1a1a] transition-colors shadow-md uppercase">确定</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const input = overlay.querySelector('#promptInput');
+            input.focus();
+
+            const close = (val) => {
+                overlay.remove();
+                callback(val);
+            };
+
+            overlay.querySelector('#promptCancel').onclick = () => close(null);
+            overlay.querySelector('#promptOk').onclick = () => close(input.value);
+            input.onkeydown = (e) => { if (e.key === 'Enter') close(input.value); };
+        }
+
+        function fallbackManualFont() {
+            customPrompt("当前浏览器沙盒权限受限，无法一键读取。\n\n请直接手动输入您电脑上已安装的字体名称（例如：Microsoft YaHei, 黑体, SimSun 等）：", (customFont) => {
+                if (customFont && customFont.trim() !== '') {
+                    const select = document.getElementById('textFontFamily');
+                    const option = document.createElement('option');
+                    option.value = customFont;
+                    option.text = customFont + " (本地手动)";
+                    select.appendChild(option);
+                    select.value = customFont;
+                    
+                    if (interactionMode === 'text' && selectedIndex !== -1 && images[selectedIndex].type === 'text') {
+                        addOrUpdateText(true);
+                    } else {
+                        draw();
+                    }
+                    customAlert("已将手动输入的字体选项添加至列表底部！\n若画布无变化，请检查字体名称拼写是否完全正确。");
+                }
+            });
+        }
+
+        async function loadLocalFonts() {
+            if ('queryLocalFonts' in window) {
+                try {
+                    const fonts = await window.queryLocalFonts();
+                    const select = document.getElementById('textFontFamily');
+                    
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = "🖥️ 本地系统字体";
+                    
+                    const fontNames = new Set();
+                    fonts.forEach(font => fontNames.add(font.family));
+                    
+                    fontNames.forEach(family => {
+                        const option = document.createElement('option');
+                        option.value = family;
+                        option.text = family;
+                        optGroup.appendChild(option);
+                    });
+                    
+                    select.appendChild(optGroup);
+                    customAlert(`成功获取 ${fontNames.size} 款本地字体！\n已添加至下拉菜单底部。`);
+                } catch (err) {
+                    fallbackManualFont();
+                }
+            } else {
+                fallbackManualFont();
+            }
+        }
+    </script>
+</body>
+</html>
