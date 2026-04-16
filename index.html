@@ -1288,7 +1288,18 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
                 } else if (activeHandle.startsWith('scale')) {
                     const oldDist = Math.sqrt((lastMousePos.x - img.x)**2 + (lastMousePos.y - img.y)**2);
                     const newDist = Math.sqrt((x - img.x)**2 + (y - img.y)**2);
-                    img.scale *= (newDist / oldDist);
+                    const scaleRatio = newDist / oldDist;
+                    img.scale *= scaleRatio;
+
+                    // 【修改在此】让裁剪形状跟随图片一起等比缩放并保持相对位置
+                    if (img.maskShapes && img.maskShapes.length > 0) {
+                        img.maskShapes.forEach(s => {
+                            s.lx *= scaleRatio; // 调整中心点横坐标
+                            s.ly *= scaleRatio; // 调整中心点纵坐标
+                            s.lw *= scaleRatio; // 调整形状宽度
+                            s.lh *= scaleRatio; // 调整形状高度
+                        });
+                    }
                 }
             }
             else if (dragTarget === 'shape' && activeShapeIndex !== -1) {
@@ -1307,12 +1318,40 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
                     s.rotation = newRotation;
                 } else {
                     const rad = -img.rotation * Math.PI / 180;
-                    const ldx = dx * Math.cos(rad) - dy * Math.sin(rad), ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
-                    if (activeHandle.includes('r')) s.lw += ldx * 2;
-                    if (activeHandle.includes('l')) s.lw -= ldx * 2;
-                    if (activeHandle.includes('b')) s.lh += ldy * 2;
-                    if (activeHandle.includes('t')) s.lh -= ldy * 2;
-                    s.lw = Math.max(10, s.lw); s.lh = Math.max(10, s.lh);
+                    const sRad = -s.rotation * Math.PI / 180;
+                    const ldx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                    const ldy = dx * Math.sin(rad) + dy * Math.cos(rad);
+                    const shdx = ldx * Math.cos(sRad) - ldy * Math.sin(sRad);
+                    const shdy = ldx * Math.sin(sRad) + ldy * Math.cos(sRad);
+
+                    // 【修改在此】修复裁剪图形缩放时方向相反的问题（改为固定对侧边缘单边缩放，取代原本以中心点对称放大的逻辑）
+                    let dw = 0, dh = 0;
+                    if (activeHandle.includes('r')) dw = shdx;
+                    if (activeHandle.includes('l')) dw = -shdx;
+                    if (activeHandle.includes('b')) dh = shdy;
+                    if (activeHandle.includes('t')) dh = -shdy;
+
+                    let newW = s.lw + dw;
+                    let newH = s.lh + dh;
+
+                    // 最小尺寸限制
+                    if (newW < 6) { dw = 6 - s.lw; newW = 6; }
+                    if (newH < 6) { dh = 6 - s.lh; newH = 6; }
+
+                    s.lw = newW;
+                    s.lh = newH;
+
+                    // 动态计算由于单边缩放而产生的中心点视觉偏移量
+                    let dcx = 0, dcy = 0;
+                    if (activeHandle.includes('r')) dcx = dw / 2;
+                    if (activeHandle.includes('l')) dcx = -dw / 2;
+                    if (activeHandle.includes('b')) dcy = dh / 2;
+                    if (activeHandle.includes('t')) dcy = -dh / 2;
+
+                    // 将形状坐标系下的偏移量，转换回图片局部坐标系中
+                    const sRadRev = s.rotation * Math.PI / 180;
+                    s.lx += dcx * Math.cos(sRadRev) - dcy * Math.sin(sRadRev);
+                    s.ly += dcx * Math.sin(sRadRev) + dcy * Math.cos(sRadRev);
                 }
             }
             lastMousePos = {x, y}; draw();
