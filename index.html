@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拼拼剪剪</title>
+    <title>艺术切片拼图 Pro - 极简极致版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
    /* 引入像素风字体：Pixelify Sans (数字/英) 和 DotGothic16 (中) */
@@ -1358,7 +1358,7 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
         };
 
         const handleUp = () => { 
-            if (isDragging || dragTarget === 'shape') {
+            if (isDragging || dragTarget === 'shape' || dragTarget === 'shape-handle') {
                 saveState();
             }
             isDragging = false; 
@@ -1372,12 +1372,16 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleUp);
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleDown(e); }, { passive: false });
-        window.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); }, { passive: false });
+        window.addEventListener('touchmove', (e) => { 
+            // 【修改在此】修复手机端模式下滑块无法正常拖动的问题：仅在拖拽画布内容或触控主工作区时阻止默认事件，从而放行侧边栏里的滑块拖拽与页面滚动
+            if (isDragging || e.target === canvas || (e.target.closest && e.target.closest('#mainWorkspace'))) {
+                e.preventDefault(); 
+            }
+            handleMove(e); 
+        }, { passive: false });
         window.addEventListener('touchend', handleUp);
 
-        // 新增：处理点击画布外侧空白区域的拖拽和平移
         const handleDownOutside = (e) => {
-            // 如果点击的是画板本身或是左侧控制面板，则不处理
             if (e.target === canvas || e.target.closest('aside')) return;
             
             const isTouch = !!e.touches;
@@ -1606,49 +1610,93 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
             });
         }
 
+        // 【修改在此】增加防抖状态锁，防止在导出期间因多次点击导致内存过载崩溃
+        let isExporting = false;
+
         async function exportSlices() {
             if (images.length === 0 && drawingPaths.length === 0) return;
-            loadingOverlay.style.display = 'flex';
-            const exportBaseSize = 3000;
+            if (isExporting) return; // 【修改在此】防止重复导出
+            isExporting = true;      // 【修改在此】锁定导出状态
+
+            try { // 【修改在此】增加 try...finally 保证导出完成或意外出错后，一定能解锁状态和释放内存
+                loadingOverlay.style.display = 'flex';
+
+            // 【修改在此】动态计算总画布尺寸，确保每张独立切片都有 4500x4500 的超高分辨率，从而让单张图体积轻松突破 5MB
+            const exportBaseSize = 4500 * gridSize; 
+
             const exportCanvas = document.getElementById('hiddenExportCanvas');
             const exCtx = exportCanvas.getContext('2d');
             exportCanvas.width = exportCanvas.height = exportBaseSize;
             const ratio = exportBaseSize / canvasSize;
             exCtx.fillStyle = canvasBgColor; exCtx.fillRect(0, 0, exportBaseSize, exportBaseSize);
             
-            images.forEach(data => {
-                exCtx.save(); exCtx.translate(data.x * ratio, data.y * ratio); exCtx.rotate(data.rotation * Math.PI / 180);
-                const dw = data.w * data.scale * ratio, dh = data.h * data.scale * ratio;
-                if (data.maskShapes && data.maskShapes.length > 0) {
-                    exCtx.save(); exCtx.beginPath();
-                    data.maskShapes.forEach(s => {
-                        const ss = {...s, lx: s.lx*ratio, ly: s.ly*ratio, lw: s.lw*ratio, lh: s.lh*ratio};
-                        defineShapePath(exCtx, ss);
-                    });
-                    exCtx.clip(); 
-                    drawObject(exCtx, data, dw, dh, ratio);
+                images.forEach(data => {
+                    exCtx.save(); exCtx.translate(data.x * ratio, data.y * ratio); exCtx.rotate(data.rotation * Math.PI / 180);
+                    const dw = data.w * data.scale * ratio, dh = data.h * data.scale * ratio;
+                    if (data.maskShapes && data.maskShapes.length > 0) {
+                        exCtx.save(); exCtx.beginPath();
+                        
+                        if (data.maskInverse) {
+                            exCtx.rect(-99999, -99999, 199998, 199998);
+                        }
+                        
+                        data.maskShapes.forEach(s => {
+                            const ss = {...s, lx: s.lx*ratio, ly: s.ly*ratio, lw: s.lw*ratio, lh: s.lh*ratio};
+                            defineShapePath(exCtx, ss);
+                        });
+                        
+                        exCtx.clip(data.maskInverse ? "evenodd" : "nonzero"); 
+                        
+                        drawObject(exCtx, data, dw, dh, ratio);
+                        exCtx.restore();
+                    } else {
+                        drawObject(exCtx, data, dw, dh, ratio);
+                    }
                     exCtx.restore();
-                } else {
-                    drawObject(exCtx, data, dw, dh, ratio);
+                });
+
+                const eb = document.createElement('canvas'); eb.width = eb.height = exportBaseSize;
+                drawPaths(eb.getContext('2d'), ratio); exCtx.drawImage(eb, 0, 0);
+
+                const sliceSize = exportBaseSize / gridSize;
+                const totalSlices = gridSize * gridSize;
+                for (let i = 0; i < totalSlices; i++) {
+                    document.getElementById('progressText').innerText = `SLICE PROCESS: ${Math.round((i+1)/totalSlices*100)}%`;
+                    const row = Math.floor(i / gridSize), col = i % gridSize;
+                    const sc = document.createElement('canvas'); sc.width = sc.height = sliceSize;
+                    sc.getContext('2d').drawImage(exportCanvas, col*sliceSize, row*sliceSize, sliceSize, sliceSize, 0, 0, sliceSize, sliceSize);
+
+                    // 【修改在此】将同步的 toDataURL 改为异步的 toBlob，防止超大图像转 Base64 耗尽内存导致二次导出卡死
+                    await new Promise(resolve => {
+                        sc.toBlob((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a'); 
+                            link.download = `ArtSlice_${i+1}.jpg`;
+                            link.href = url;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url); // 清理 URL 引用
+                            sc.width = 0; sc.height = 0; // 【修改在此】强制释放单个切片的 Canvas 内存
+                            resolve();
+                        }, 'image/jpeg', 1.0);
+                    });
+                    
+                    await new Promise(r => setTimeout(r, 400));
                 }
-                exCtx.restore();
-            });
 
-            const eb = document.createElement('canvas'); eb.width = eb.height = exportBaseSize;
-            drawPaths(eb.getContext('2d'), ratio); exCtx.drawImage(eb, 0, 0);
+                // 【修改在此】强制清空巨大的主底图内存，避免下次操作 OOM (Out Of Memory)
+                exportCanvas.width = 0; 
+                exportCanvas.height = 0;
+                eb.width = 0; 
+                eb.height = 0;
 
-            const sliceSize = exportBaseSize / gridSize;
-            const totalSlices = gridSize * gridSize;
-            for (let i = 0; i < totalSlices; i++) {
-                document.getElementById('progressText').innerText = `SLICE PROCESS: ${Math.round((i+1)/totalSlices*100)}%`;
-                const row = Math.floor(i / gridSize), col = i % gridSize;
-                const sc = document.createElement('canvas'); sc.width = sc.height = sliceSize;
-                sc.getContext('2d').drawImage(exportCanvas, col*sliceSize, row*sliceSize, sliceSize, sliceSize, 0, 0, sliceSize, sliceSize);
-                const link = document.createElement('a'); link.download = `ArtSlice_${i+1}.jpg`;
-                link.href = sc.toDataURL('image/jpeg', 0.95); link.click();
-                await new Promise(r => setTimeout(r, 400));
+            } catch (err) {
+                console.error("导出切片异常:", err);
+            } finally {
+                loadingOverlay.style.display = 'none';
+                isExporting = false; // 【修改在此】任务彻底结束，解除锁定允许下一次点击
             }
-            loadingOverlay.style.display = 'none';
         }
 
         if (!CanvasRenderingContext2D.prototype.roundRect) {
