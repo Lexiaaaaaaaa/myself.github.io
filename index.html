@@ -288,8 +288,15 @@
                         </div>
                         <div class="flex-1 space-y-5">
                             <div>
-                                <div class="flex justify-between text-[10px] mb-1.5 font-black choc-text opacity-50 uppercase tracking-tighter" style="color: var(--choc-dark)"><span>粗细</span><span id="brushSizeVal">5px</span></div>
-                                <input type="range" id="brushSize" min="1" max="100" value="5" class="w-full">
+                                <!-- 【修改在此】将原本单纯的文本 span 替换为 flex 布局，实现滑块+自定义数值输入框的双重控制 -->
+                                <div class="flex justify-between items-center text-[10px] mb-1.5 font-black choc-text uppercase tracking-tighter" style="color: var(--choc-dark)">
+                                    <span class="opacity-50">粗细</span>
+                                    <div class="flex items-center gap-1 opacity-90">
+                                        <input type="number" id="brushSizeInput" min="0.1" max="999" step="0.1" value="5" class="w-12 py-0.5 bg-white border border-emerald-200 rounded text-center text-slate-700 outline-none focus:border-cyan-400 font-bold shadow-sm transition-all">
+                                        <span class="opacity-50">px</span>
+                                    </div>
+                                </div>
+                                <input type="range" id="brushSize" min="0.1" max="100" step="0.1" value="5" class="w-full">
                             </div>
                             <div id="brushOpacityWrapper">
                                 <div class="flex justify-between text-[10px] mb-1.5 font-black choc-text opacity-50 uppercase tracking-tighter" style="color: var(--choc-dark)"><span id="opacityLabel">透明度</span><span id="brushOpacityVal">100%</span></div>
@@ -606,11 +613,36 @@
             updateViewTransform(parseFloat(e.target.value), viewOffsetX, viewOffsetY);
         });
 
+        // 【修改在此】绑定滑块事件，拖动滑块时同步更新到自定义数值框
         brushSizeSlider.addEventListener('input', (e) => {
             const val = e.target.value;
-            document.getElementById('brushSizeVal').innerText = val + 'px';
-            if (drawSubMode === 'brush') brushConfig.size = parseInt(val);
-            else eraserConfig.size = parseInt(val);
+            document.getElementById('brushSizeInput').value = val;
+            if (drawSubMode === 'brush') brushConfig.size = parseFloat(val);
+            else eraserConfig.size = parseFloat(val);
+        });
+
+        // 【修改在此】新增数字输入框的事件监听，让用户直接输入数值也能改变画笔大小
+        document.getElementById('brushSizeInput').addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val)) return; // 用户还在输入中，暂不处理
+            if (val < 0.1) val = 0.1; // 维持上个版本设定的极细0.1px下限
+            
+            document.getElementById('brushSize').value = val; // 反向同步给范围滑块
+            
+            if (drawSubMode === 'brush') brushConfig.size = val;
+            else eraserConfig.size = val;
+        });
+
+        // 【修改在此】当数值框失去焦点时(校验输入)，如果数值非法则重置为最低有效值
+        document.getElementById('brushSizeInput').addEventListener('change', (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val) || val < 0.1) {
+                val = 0.1;
+                e.target.value = val;
+                document.getElementById('brushSize').value = val;
+            }
+            if (drawSubMode === 'brush') brushConfig.size = val;
+            else eraserConfig.size = val;
         });
 
         brushOpacitySlider.addEventListener('input', (e) => {
@@ -813,8 +845,10 @@
 
         // 设置画笔子模式
         function setDrawSubMode(subMode) {
-            if (drawSubMode === 'brush') { brushConfig.size = parseInt(brushSizeSlider.value); brushConfig.opacity = parseInt(brushOpacitySlider.value); }
-            else { eraserConfig.size = parseInt(brushSizeSlider.value); eraserConfig.opacity = parseInt(brushOpacitySlider.value); }
+            // 【修改在此】优先从数值框读取真实大小，以防止滑块的max=100限制了用户可能输入的大于100的自定义数值
+            if (drawSubMode === 'brush') { brushConfig.size = parseFloat(document.getElementById('brushSizeInput').value); brushConfig.opacity = parseInt(brushOpacitySlider.value); }
+            else { eraserConfig.size = parseFloat(document.getElementById('brushSizeInput').value); eraserConfig.opacity = parseInt(brushOpacitySlider.value); }
+            
             drawSubMode = subMode;
             const isBrush = subMode === 'brush';
             document.getElementById('brushSubBtn').className = `tool-toggle-btn ${isBrush ? 'tool-toggle-active' : 'tool-toggle-inactive'}`;
@@ -822,7 +856,9 @@
             document.getElementById('brushColorWrapper').style.display = isBrush ? "block" : "none";
             brushSizeSlider.value = isBrush ? brushConfig.size : eraserConfig.size;
             brushOpacitySlider.value = isBrush ? brushConfig.opacity : eraserConfig.opacity;
-            document.getElementById('brushSizeVal').innerText = brushSizeSlider.value + 'px';
+            
+            // 【修改在此】切换画笔/橡皮擦后，将准确的数值回写至输入框
+            document.getElementById('brushSizeInput').value = isBrush ? brushConfig.size : eraserConfig.size;
             document.getElementById('brushOpacityVal').innerText = brushOpacitySlider.value + '%';
         }
 
