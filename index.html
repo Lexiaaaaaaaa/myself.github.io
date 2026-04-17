@@ -177,9 +177,11 @@
 </head>
 <body class="min-h-screen">
 
-    <div class="flex flex-col lg:flex-row h-screen overflow-hidden">
+    <!-- 【修改在此】手机端反转列布局 (flex-col-reverse)，使得主画布在上方，操作面板在下方 -->
+    <div class="flex flex-col-reverse lg:flex-row h-screen overflow-hidden">
         <!-- 左侧控制栏 -->
-        <aside class="w-full lg:w-80 aside-panel p-6 overflow-y-auto z-30 flex flex-col border-r border-cyan-100/50">
+        <!-- 【修改在此】手机端操作面板高度精准限制为 40vh (40%)，桌面端恢复全屏高度 -->
+        <aside class="w-full lg:w-80 aside-panel p-6 overflow-y-auto z-30 flex flex-col border-t lg:border-t-0 lg:border-r border-cyan-100/50 h-[40vh] lg:h-full shrink-0">
             <div class="mb-8 flex items-end justify-between gap-4">
                 <!-- 切分模板 -->
                 <div class="space-y-3 flex-1">
@@ -428,7 +430,8 @@
         </aside>
 
         <!-- 画布区 -->
-        <main id="mainWorkspace" class="flex-1 flex items-center justify-center p-4 md:p-12 relative bg-[#E8FDFA]">
+        <!-- 【修改在此】手机端画布区域高度精准限制为 60vh (60%)，桌面端自适应 -->
+        <main id="mainWorkspace" class="flex-1 h-[60vh] lg:h-full shrink-0 flex items-center justify-center p-4 md:p-12 relative bg-[#E8FDFA] overflow-hidden">
             <div id="canvasWrapper">
                 <div id="canvasContainer">
                     <div id="canvasBg"></div>
@@ -548,13 +551,23 @@
         }
 
         function initCanvas() {
-            const containerWidth = window.innerWidth - (window.innerWidth >= 1024 ? 320 : 0) - 100;
-            const containerHeight = window.innerHeight - 150;
+            // 【修改在此】动态获取画布容器的实际可用物理尺寸，完美适配手机端 60% 的新占比限制，防止画布溢出或无法居中
+            const workspace = document.getElementById('mainWorkspace');
+            const isMobile = window.innerWidth < 1024;
+            
+            const paddingX = isMobile ? 32 : 100;
+            const paddingY = isMobile ? 32 : 100;
+            
+            const containerWidth = workspace.clientWidth - paddingX;
+            const containerHeight = workspace.clientHeight - paddingY;
+            
             // 调大画布显示上限到 2500
-            const size = Math.min(containerWidth, containerHeight, 2500);
+            const size = Math.max(200, Math.min(containerWidth, containerHeight, 2500));
             canvasSize = size;
+            
             canvasContainer.style.width = size + 'px';
             canvasContainer.style.height = size + 'px';
+            
             canvas.width = size + UI_PADDING * 2;
             canvas.height = size + UI_PADDING * 2;
             canvas.style.left = -UI_PADDING + 'px';
