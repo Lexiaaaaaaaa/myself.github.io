@@ -409,7 +409,7 @@
                         <span id="viewScaleVal" class="text-[10px] font-black px-2 py-0.5 rounded-md" style="background-color: var(--mint-primary); color: var(--choc-dark)">100%</span>
                     </div>
                     <div class="flex items-center gap-4">
-                        <input type="range" id="viewScaleRange" min="0.5" max="5" step="0.01" value="1" class="flex-1">
+                        <input type="range" id="viewScaleRange" min="0.5" max="10" step="0.01" value="1" class="flex-1">
                         <button onclick="resetViewTransform()" class="text-[10px] font-black text-cyan-400 hover:text-cyan-600 transition-colors shrink-0 uppercase">RESET</button>
                     </div>
                 </div>
@@ -886,7 +886,7 @@
 
         function updateViewTransform(newScale, newX, newY) {
             // 视口缩放限制更新为 5.0
-            viewScale = Math.max(0.5, Math.min(5, newScale));
+            viewScale = Math.max(1.0, Math.min(10, newScale));
             document.getElementById('viewScaleRange').value = viewScale;
             document.getElementById('viewScaleVal').innerText = Math.round(viewScale * 100) + '%';
             viewOffsetX = newX; viewOffsetY = newY;
@@ -1219,11 +1219,27 @@ const r = (cx, cy) => ctx.rect((cx - 5.5) * p, (cy - 5.5) * p, p, p);
         };
 
         const handleMove = (e) => {
-            if (e.touches && e.touches.length === 2 && initialPinchDist !== null) {
+            if (e.touches && e.touches.length >= 2 && initialPinchDist !== null) {
                 const currentDist = Math.sqrt((e.touches[0].clientX - e.touches[1].clientX)**2 + (e.touches[0].clientY - e.touches[1].clientY)**2);
-                updateViewTransform(initialPinchScale * (currentDist / initialPinchDist), viewOffsetX, viewOffsetY);
+                
+                const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                
+                let dx = 0;
+                let dy = 0;
+
+                // 【修改在此】严格限制：只用在画笔模式启用的情况下！！允许双指移动平移画布。其他模式仅响应双指缩放。
+                if (interactionMode === 'draw') {
+                    dx = (currentCenterX - lastScreenPos.x) / viewScale;
+                    dy = (currentCenterY - lastScreenPos.y) / viewScale;
+                }
+
+                updateViewTransform(initialPinchScale * (currentDist / initialPinchDist), viewOffsetX + dx, viewOffsetY + dy);
+                
+                lastScreenPos = { x: currentCenterX, y: currentCenterY };
                 return;
             }
+            
             if (!isDragging) return;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
